@@ -27,7 +27,7 @@ FROM debian:bookworm-slim
 # Install runtime dependencies and create user
 RUN apt-get update && apt-get install -y \
   ca-certificates \
-  curl \
+  netcat-traditional \
   && rm -rf /var/lib/apt/lists/* \
   && groupadd -r jsonvault \
   && useradd -r -g jsonvault jsonvault
@@ -55,7 +55,7 @@ ENV JSONVAULT_NODE_ID=1
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:${JSONVAULT_PORT}/health || exit 1
+  CMD nc -z localhost ${JSONVAULT_PORT} || exit 1
 
 # Default command with Raft consensus
-CMD ["sh", "-c", "jsonvault-server --enable-raft --address 0.0.0.0:${JSONVAULT_PORT} --node-id ${JSONVAULT_NODE_ID}"]
+CMD ["sh", "-c", "jsonvault-server --address 0.0.0.0:${JSONVAULT_PORT} --node-id ${JSONVAULT_NODE_ID}"]

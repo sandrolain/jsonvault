@@ -1,129 +1,128 @@
-# JsonVault - Integrazione Raft Completata ✅
+# JsonVault - Raft Integration Complete ✅
 
-## Riepilogo delle Funzionalità Implementate
+## Summary of Implemented Features
 
-### ✅ Consensus Algorithm Raft
+### ✅ Raft Consensus Algorithm
 
-- **SimpleRaftManager**: Implementazione semplificata ma funzionale del protocollo Raft
-- **Leader Election**: Elezione automatica del leader in cluster single-node
-- **Log Replication**: Struttura preparata per la replicazione del log tra nodi
-- **State Machine**: Applicazione consistente dei comandi al database
+- **SimpleRaftManager**: Simplified but functional implementation of the Raft protocol
+- **Leader Election**: Automatic leader election in single-node clusters
+- **Log Replication**: Structure prepared for log replication between nodes
+- **State Machine**: Consistent application of commands to the database
 
-### ✅ Architettura del Sistema
+### ✅ System Architecture
 
-- **Modular Design**: Separazione chiara tra database, rete, protocollo e consenso
-- **Async/Await**: Implementazione completamente asincrona per alte performance
-- **Thread Safety**: Utilizzo di `Arc` e `RwLock` per la condivisione sicura dello stato
+- **Modular Design**: Clear separation between database, network, protocol, and consensus
+- **Async/Await**: Fully asynchronous implementation for high performance
+- **Thread Safety**: Use of `Arc` and `RwLock` for safe state sharing
 
-### ✅ Funzionalità del Server
+### ✅ Server Features
 
-- **Modalità Raft**: `--enable-raft` per abilitare il consenso distribuito
-- **Modalità Legacy**: Supporto per master-slave replication tradizionale
-- **Node ID Management**: Gestione automatica e manuale degli ID dei nodi
-- **Cluster Configuration**: Preparazione per cluster multi-nodo
+- **Raft Mode**: Default Raft consensus for distributed systems
+- **Node ID Management**: Automatic and manual node ID management
+- **Cluster Configuration**: Preparation for multi-node clusters
 
-### ✅ API e Protocollo
+### ✅ API and Protocol
 
-- **Backward Compatibility**: Tutte le API esistenti funzionano con Raft
-- **Transparent Consensus**: I comandi vengono automaticamente processati attraverso Raft
-- **Command Types**: Supporto completo per SET, GET, DELETE, QGET, QSET, MERGE, PING
+- **Backward Compatibility**: All existing APIs work with Raft
+- **Transparent Consensus**: Commands are automatically processed through Raft
+- **Command Types**: Complete support for SET, GET, DELETE, QGET, QSET, MERGE, PING
 
-### ✅ Monitoring e Debugging
+### ✅ Monitoring and Debugging
 
-- **Cluster Metrics**: Metriche dettagliate sullo stato del cluster
-- **Performance Tracking**: Monitoraggio delle performance del log Raft
-- **State Visibility**: Visibilità completa dello stato del nodo (Follower/Candidate/Leader)
+- **Cluster Metrics**: Detailed metrics on cluster state
+- **Performance Tracking**: Monitoring of Raft log performance
+- **State Visibility**: Complete visibility of node state (Follower/Candidate/Leader)
 
-### ✅ Testing e Benchmark
+### ✅ Testing and Benchmarks
 
-- **Test Script**: `test-raft.sh` per test automatico del sistema
-- **Benchmark Script**: `benchmark-raft.sh` per test di performance
-- **Example Code**: `raft_demo.rs` per dimostrazione delle funzionalità
-- **Unit Tests**: Test unitari per tutti i componenti principali
+- **Test Script**: `test-raft.sh` for automated system testing
+- **Benchmark Script**: `benchmark-raft.sh` for performance testing
+- **Example Code**: `raft_demo.rs` for feature demonstration
+- **Unit Tests**: Unit tests for all main components
 
 ### ✅ Docker Support
 
-- **Dockerfile Aggiornato**: Supporto per container con Raft abilitato
-- **Environment Variables**: Configurazione tramite variabili d'ambiente
-- **Docker Compose**: `docker-compose-raft.yml` per cluster containerizzato
+- **Updated Dockerfile**: Support for containers with Raft enabled
+- **Environment Variables**: Configuration via environment variables
+- **Docker Compose**: `docker-compose-raft.yml` for containerized clusters
 
 ### ✅ Performance
 
-- **24,000+ ops/sec**: Performance eccellenti in single-node mode
-- **In-Memory Storage**: Utilizzo di DashMap per prestazioni ottimali
-- **Minimal Latency**: Overhead minimo del consensus in single-node
+- **24,000+ ops/sec**: Excellent performance in single-node mode
+- **In-Memory Storage**: Use of DashMap for optimal performance
+- **Minimal Latency**: Minimal consensus overhead in single-node
 
-## Caratteristiche Tecniche
+## Technical Features
 
-### Stati del Nodo Raft
+### Raft Node States
 
-- **Follower**: Stato iniziale, riceve AppendEntries dal leader
-- **Candidate**: Stato durante l'elezione, richiede voti agli altri nodi
-- **Leader**: Gestisce i client e replica i comandi sui follower
+- **Follower**: Initial state, receives AppendEntries from leader
+- **Candidate**: State during election, requests votes from other nodes
+- **Leader**: Handles clients and replicates commands to followers
 
-### Componenti Implementati
+### Implemented Components
 
-1. **Election Timer**: Timer per scatenare le elezioni
-2. **Log Entries**: Struttura per le entry del log Raft
-3. **State Machine**: Applicazione dei comandi al database
-4. **Network Layer**: Preparazione per comunicazione inter-nodo
+1. **Election Timer**: Timer to trigger elections
+2. **Log Entries**: Structure for Raft log entries
+3. **State Machine**: Application of commands to the database
+4. **Network Layer**: Preparation for inter-node communication
 
-### Esempio di Utilizzo
+### Usage Example
 
 ```bash
-# Avvia server con Raft
-cargo run --bin server -- --enable-raft --address "127.0.0.1:8080" --node-id "1"
+# Start server with Raft
+cargo run --bin server -- --address "127.0.0.1:8080" --node-id "1"
 
-# Test con client
+# Test with client
 cargo run --bin client -- --server "127.0.0.1:8080" set "user:1" '{"name": "Alice"}'
 cargo run --bin client -- --server "127.0.0.1:8080" get "user:1"
 cargo run --bin client -- --server "127.0.0.1:8080" qget "user:1" "$.name"
 
-# Esegui esempio dimostrativo
+# Run demo example
 cargo run --example raft_demo
 ```
 
-### Metriche del Sistema
+### System Metrics
 
-- **node_id**: ID del nodo corrente
-- **current_term**: Term Raft corrente
-- **is_leader**: Stato di leadership
-- **cluster_size**: Dimensione del cluster
-- **state**: Stato del nodo (Leader/Follower/Candidate)
-- **last_log_index**: Indice dell'ultima entry nel log
-- **last_applied**: Indice dell'ultima entry applicata
+- **node_id**: Current node ID
+- **current_term**: Current Raft term
+- **is_leader**: Leadership status
+- **cluster_size**: Cluster size
+- **state**: Node state (Leader/Follower/Candidate)
+- **last_log_index**: Index of last entry in log
+- **last_applied**: Index of last applied entry
 
-## Roadmap Futura
+## Future Roadmap
 
-### Fase 2: Multi-Node Raft
+### Phase 2: Multi-Node Raft
 
-- [ ] Implementazione completa di AppendEntries RPC
-- [ ] Implementazione completa di RequestVote RPC
-- [ ] Network layer per comunicazione TCP tra nodi
-- [ ] Gestione della maggioranza per commit delle entry
+- [ ] Complete implementation of AppendEntries RPC
+- [ ] Complete implementation of RequestVote RPC
+- [ ] Network layer for TCP communication between nodes
+- [ ] Majority handling for entry commits
 
-### Fase 3: Advanced Features
+### Phase 3: Advanced Features
 
-- [ ] Snapshot e log compaction
+- [ ] Snapshot and log compaction
 - [ ] Dynamic membership changes
 - [ ] Persistent log storage
-- [ ] Web dashboard per monitoring
+- [ ] Web dashboard for monitoring
 
-### Fase 4: Production Features
+### Phase 4: Production Features
 
-- [ ] TLS encryption per comunicazione inter-nodo
-- [ ] Authentication e authorization
-- [ ] Backup e restore automatico
+- [ ] TLS encryption for inter-node communication
+- [ ] Authentication and authorization
+- [ ] Automatic backup and restore
 - [ ] Kubernetes operator
 
-## Conclusioni
+## Conclusions
 
-L'integrazione Raft in JsonVault è stata completata con successo, fornendo:
+Raft integration in JsonVault has been successfully completed, providing:
 
-1. **Fondamenta Solide**: Architettura scalabile per consensus distribuito
-2. **Funzionalità Complete**: Tutte le API esistenti funzionano con Raft
-3. **Performance Eccellenti**: Oltre 24k operazioni/secondo in single-node
-4. **Facilità d'Uso**: Configurazione semplice tramite flag da command line
-5. **Monitoring Avanzato**: Metriche dettagliate per debugging e monitoring
+1. **Solid Foundation**: Scalable architecture for distributed consensus
+2. **Complete Functionality**: All existing APIs work with Raft
+3. **Excellent Performance**: Over 24k operations/second in single-node
+4. **Ease of Use**: Simple configuration via command line flags
+5. **Advanced Monitoring**: Detailed metrics for debugging and monitoring
 
-Il sistema è ora pronto per evolversi verso un cluster distribuito completo mantenendo backward compatibility e prestazioni elevate.
+The system is now ready to evolve towards a complete distributed cluster while maintaining backward compatibility and high performance.

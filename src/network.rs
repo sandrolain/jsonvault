@@ -6,27 +6,27 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
-/// Server TCP per il database JSON
+/// TCP server for JSON database
 pub struct TcpServer {
     database: Arc<Database>,
     address: String,
 }
 
 impl TcpServer {
-    /// Crea un nuovo server TCP
+    /// Create a new TCP server
     pub fn new(database: Arc<Database>, address: String) -> Self {
         Self { database, address }
     }
 
-    /// Avvia il server
+    /// Start the server
     pub async fn start(&self) -> Result<(), Box<dyn std::error::Error>> {
         let listener = TcpListener::bind(&self.address).await?;
-        info!("Server avviato su {}", self.address);
+        info!("Server started on {}", self.address);
 
         loop {
             match listener.accept().await {
                 Ok((stream, addr)) => {
-                    info!("Nuova connessione da {}", addr);
+                    info!("New connection from {}", addr);
                     let db = Arc::clone(&self.database);
                     tokio::spawn(async move {
                         if let Err(e) = handle_connection(stream, db).await {
@@ -42,34 +42,34 @@ impl TcpServer {
     }
 }
 
-/// Gestisce una singola connessione TCP
+/// Handle a single TCP connection
 async fn handle_connection(mut stream: TcpStream, database: Arc<Database>) -> Result<(), String> {
     let mut buffer = BytesMut::with_capacity(4096);
 
     loop {
-        // Leggi dati dal socket
+        // Read data from socket
         match stream.read_buf(&mut buffer).await {
             Ok(0) => {
-                debug!("Connessione chiusa dal client");
+                debug!("Connection closed by client");
                 break;
             }
             Ok(n) => {
-                debug!("Ricevuti {} bytes", n);
+                debug!("Received {} bytes", n);
             }
             Err(e) => return Err(format!("Read error: {}", e)),
         }
 
-        // Processa i messaggi nel buffer
+        // Process messages in buffer
         while let Some((command, remaining)) = parse_message(&buffer)? {
             buffer = remaining;
 
-            debug!("Comando ricevuto: {}", command);
+            debug!("Received command: {}", command);
 
-            // Esegui il comando
+            // Execute command
             let response = database.execute_command(command).await;
-            debug!("Risposta: {}", response);
+            debug!("Response: {}", response);
 
-            // Invia la risposta
+            // Send response
             send_response(&mut stream, response).await?;
         }
     }
@@ -77,11 +77,11 @@ async fn handle_connection(mut stream: TcpStream, database: Arc<Database>) -> Re
     Ok(())
 }
 
-/// Protocollo di comunicazione semplice basato su lunghezza + payload
-/// Formato: [lunghezza:4 bytes][payload JSON]
+/// Simple communication protocol based on length + payload
+/// Format: [length:4 bytes][JSON payload]
 fn parse_message(buffer: &BytesMut) -> Result<Option<(Command, BytesMut)>, String> {
     if buffer.len() < 4 {
-        return Ok(None); // Non abbastanza dati per la lunghezza
+        return Ok(None); // Not enough data for length
     }
 
     let mut length_bytes = [0u8; 4];
@@ -89,7 +89,7 @@ fn parse_message(buffer: &BytesMut) -> Result<Option<(Command, BytesMut)>, Strin
     let message_length = u32::from_be_bytes(length_bytes) as usize;
 
     if buffer.len() < 4 + message_length {
-        return Ok(None); // Non abbastanza dati per il messaggio completo
+        return Ok(None); // Not enough data for complete message
     }
 
     // Extract the payload
@@ -110,7 +110,7 @@ fn parse_message(buffer: &BytesMut) -> Result<Option<(Command, BytesMut)>, Strin
     Ok(Some((command, remaining)))
 }
 
-/// Invia una risposta al client
+/// Send a response to the client
 async fn send_response(stream: &mut TcpStream, response: Response) -> Result<(), String> {
     // Serialize response using JSON
     let payload_str = serde_json::to_string(&response)
@@ -118,7 +118,7 @@ async fn send_response(stream: &mut TcpStream, response: Response) -> Result<(),
     let payload = payload_str.as_bytes();
     let payload_length = payload.len() as u32;
 
-    // Crea il messaggio con lunghezza + payload
+    // Create message with length + payload
     let mut message = BytesMut::with_capacity(4 + payload.len());
     message.put_u32(payload_length);
     message.extend_from_slice(payload);
@@ -142,16 +142,16 @@ pub struct TcpClient {
 }
 
 impl TcpClient {
-    /// Connette al server
+    /// Connect to server
     pub async fn connect(address: &str) -> Result<Self, String> {
         let stream = TcpStream::connect(address)
             .await
-            .map_err(|e| format!("Connessione fallita: {}", e))?;
-        info!("Connesso al server {}", address);
+            .map_err(|e| format!("Connection failed: {}", e))?;
+        info!("Connected to server {}", address);
         Ok(Self { stream })
     }
 
-    /// Invia un comando e riceve la risposta
+    /// Send a command and receive the response
     pub async fn send_command(&mut self, command: Command) -> Result<Response, String> {
         debug!("Sending command: {}", command);
 
@@ -166,7 +166,7 @@ impl TcpClient {
         message.put_u32(payload_length);
         message.extend_from_slice(payload);
 
-        // Invia il messaggio
+        // Send the message
         self.stream
             .write_all(&message)
             .await
@@ -178,7 +178,7 @@ impl TcpClient {
 
         // Receive the response
         let response = self.receive_response().await?;
-        debug!("Risposta ricevuta: {}", response);
+        debug!("Response received: {}", response);
 
         Ok(response)
     }
@@ -228,11 +228,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_tcp_communication() {
-        // Avvia il server in background
+        // Start the server in background
         let database = Arc::new(Database::new());
         let _server = TcpServer::new(database, "127.0.0.1:0".to_string());
 
-        // Per questo test, usiamo un indirizzo fisso
+        // For this test, use a fixed address
         let database = Arc::new(Database::new());
         let server = TcpServer::new(database, "127.0.0.1:8081".to_string());
 
@@ -240,10 +240,10 @@ mod tests {
             let _ = server.start().await;
         });
 
-        // Aspetta che il server si avvii
+        // Wait for server to start
         sleep(Duration::from_millis(100)).await;
 
-        // Testa il client
+        // Test the client
         let mut client = TcpClient::connect("127.0.0.1:8081").await.unwrap();
 
         // Test SET
