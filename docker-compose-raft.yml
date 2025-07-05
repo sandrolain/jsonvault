@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  jsonvault-node1:
+    build: .
+    container_name: jsonvault-node1
+    environment:
+      - RUST_LOG=info
+      - JSONVAULT_PORT=8080
+      - JSONVAULT_ENABLE_RAFT=true
+    ports:
+      - "8080:8080"
+    networks:
+      - jsonvault-cluster
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  jsonvault-node2:
+    build: .
+    container_name: jsonvault-node2
+    environment:
+      - RUST_LOG=info
+      - JSONVAULT_PORT=8080
+      - JSONVAULT_ENABLE_RAFT=true
+    ports:
+      - "8081:8080"
+    networks:
+      - jsonvault-cluster
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - jsonvault-node1
+
+  jsonvault-node3:
+    build: .
+    container_name: jsonvault-node3
+    environment:
+      - RUST_LOG=info
+      - JSONVAULT_PORT=8080
+      - JSONVAULT_ENABLE_RAFT=true
+    ports:
+      - "8082:8080"
+    networks:
+      - jsonvault-cluster
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - jsonvault-node1
+      - jsonvault-node2
+
+networks:
+  jsonvault-cluster:
+    driver: bridge

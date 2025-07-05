@@ -1,0 +1,320 @@
+version: "3"
+
+vars:
+  PACKAGE_NAME: jsonvault
+  DEFAULT_PORT: 8080
+  REPLICA_PORT: 8081
+  TEST_PORT: 9090
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  # Development tasks
+  check:
+    desc: Check code with clippy and formatting
+    cmds:
+      - cargo fmt --check
+      - cargo clippy --all-targets --all-features -- -D warnings
+      - cargo check --all-targets --all-features
+
+  format:
+    desc: Format code
+    cmds:
+      - cargo fmt
+
+  fix:
+    desc: Fix clippy warnings and format code
+    cmds:
+      - cargo clippy --fix --allow-dirty --allow-staged
+      - cargo fmt
+
+  # Build tasks
+  build:
+    desc: Build the project in debug mode
+    cmds:
+      - cargo build
+
+  build-release:
+    desc: Build the project in release mode
+    cmds:
+      - cargo build --release
+
+  build-all:
+    desc: Build all targets (bins, examples, benches)
+    cmds:
+      - cargo build --all-targets
+
+  # Test tasks
+  test:
+    desc: Run all tests
+    cmds:
+      - cargo test
+
+  test-verbose:
+    desc: Run tests with verbose output
+    cmds:
+      - cargo test -- --nocapture
+
+  test-integration:
+    desc: Run integration tests
+    cmds:
+      - chmod +x test.sh
+      - ./test.sh
+
+  # Benchmark tasks
+  bench:
+    desc: Run benchmarks
+    cmds:
+      - cargo bench
+
+  bench-baseline:
+    desc: Run benchmarks and save as baseline
+    cmds:
+      - cargo bench -- --save-baseline main
+
+  # Run tasks
+  run-server:
+    desc: Run the server on default port
+    cmds:
+      - cargo run --bin server -- --port {{.DEFAULT_PORT}}
+
+  run-server-replica:
+    desc: Run a replica server
+    cmds:
+      - cargo run --bin server -- --port {{.REPLICA_PORT}} --master-address 127.0.0.1:{{.DEFAULT_PORT}}
+
+  run-client:
+    desc: Run interactive client
+    cmds:
+      - cargo run --bin client -- --address 127.0.0.1:{{.DEFAULT_PORT}}
+
+  run-example:
+    desc: Run basic usage example
+    cmds:
+      - cargo run --example basic_usage
+
+  # Server management tasks
+  start-cluster:
+    desc: Start a master server and a replica
+    deps: [build]
+    cmds:
+      - |
+        echo "Starting master server on port {{.DEFAULT_PORT}}..."
+        cargo run --bin server -- --port {{.DEFAULT_PORT}} &
+        MASTER_PID=$!
+        sleep 2
+        echo "Starting replica server on port {{.REPLICA_PORT}}..."
+        cargo run --bin server -- --port {{.REPLICA_PORT}} --master-address 127.0.0.1:{{.DEFAULT_PORT}} &
+        REPLICA_PID=$!
+        echo "Cluster started. Master PID: $MASTER_PID, Replica PID: $REPLICA_PID"
+        echo "Press Ctrl+C to stop both servers"
+        trap "kill $MASTER_PID $REPLICA_PID" INT
+        wait
+
+  # Clean tasks
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - cargo clean
+
+  clean-all:
+    desc: Clean all artifacts including target directory
+    cmds:
+      - cargo clean
+      - rm -rf target/
+
+  # Documentation tasks
+  doc:
+    desc: Generate documentation
+    cmds:
+      - cargo doc --no-deps
+
+  doc-open:
+    desc: Generate and open documentation
+    cmds:
+      - cargo doc --no-deps --open
+
+  # Go client tasks
+  go-build:
+    desc: Build Go client library
+    dir: go-client
+    cmds:
+      - go build -v .
+
+  go-test:
+    desc: Test Go client library
+    dir: go-client
+    cmds:
+      - go test -v ./...
+
+  go-example:
+    desc: Run Go client main example
+    dir: go-client/example
+    deps: [run-test-server]
+    cmds:
+      - go run main.go
+
+  go-simple:
+    desc: Run Go simple example
+    dir: go-client/example
+    deps: [run-test-server]
+    cmds:
+      - go run simple.go
+
+  go-build-examples:
+    desc: Build Go example binaries
+    dir: go-client/example
+    cmds:
+      - go build -o main-example main.go
+      - go build -o simple-example simple.go
+
+  run-test-server:
+    desc: Start server for testing (background)
+    cmds:
+      - |
+        if ! pgrep -f "server.*{{.TEST_PORT}}" > /dev/null; then
+          echo "Starting test server on port {{.TEST_PORT}}..."
+          cargo run --bin server -- --port {{.TEST_PORT}} &
+          sleep 2
+        else
+          echo "Test server already running on port {{.TEST_PORT}}"
+        fi
+
+  stop-test-server:
+    desc: Stop test server
+    cmds:
+      - |
+        if pgrep -f "server.*{{.TEST_PORT}}" > /dev/null; then
+          echo "Stopping test server on port {{.TEST_PORT}}..."
+          pkill -f "server.*{{.TEST_PORT}}"
+        else
+          echo "No test server running on port {{.TEST_PORT}}"
+        fi
+
+  # Full workflow tasks
+  ci:
+    desc: Run full CI pipeline (check, test, build)
+    cmds:
+      - task: check
+      - task: test
+      - task: test-integration
+      - task: build-release
+
+  full-test:
+    desc: Run all tests including Go client
+    cmds:
+      - task: test
+      - task: go-test
+      - task: test-integration
+
+  prepare-release:
+    desc: Prepare for release (format, check, test, build)
+    cmds:
+      - task: format
+      - task: check
+      - task: full-test
+      - task: build-release
+      - task: doc
+
+  # Utility tasks
+  deps:
+    desc: Check and update dependencies
+    cmds:
+      - cargo update --dry-run
+      - echo "Run 'cargo update' to update dependencies"
+
+  security-audit:
+    desc: Run security audit
+    cmds:
+      - cargo audit
+
+  install-tools:
+    desc: Install development tools
+    cmds:
+      - cargo install cargo-audit
+      - cargo install cargo-outdated
+      - cargo install cargo-tree
+
+  # Quick development shortcuts
+  dev:
+    desc: Quick development cycle (format, check, test)
+    cmds:
+      - task: format
+      - task: check
+      - task: test
+
+  quick-test:
+    desc: Quick test with a running test server
+    cmds:
+      - task: run-test-server
+      - sleep 1
+      - task: test-integration
+      - task: stop-test-server
+
+  # Git and project initialization tasks
+  init-git:
+    desc: Initialize git repository
+    cmds:
+      - git init
+      - git add .
+      - git commit -m "Initial commit - Rust JSON Database with JSONPath support"
+
+  status:
+    desc: Show project status and information
+    cmds:
+      - echo "=== Rust JSON Database Project Status ==="
+      - echo "Package name:" {{.PACKAGE_NAME}}
+      - echo "Default server port:" {{.DEFAULT_PORT}}
+      - echo "Replica server port:" {{.REPLICA_PORT}}
+      - echo "Test server port:" {{.TEST_PORT}}
+      - echo ""
+      - echo "Rust version:"
+      - rustc --version
+      - echo ""
+      - echo "Go version:"
+      - go version
+      - echo ""
+      - echo "Project structure:"
+      - find . -name "*.rs" -o -name "*.go" -o -name "*.toml" -o -name "*.yml" -o -name "*.md" -o -name "*.sh" | grep -v target | head -20
+
+  # Docker and Kubernetes tasks
+  docker-build:
+    desc: Build JsonVault Docker image
+    cmds:
+      - docker build -t jsonvault:latest .
+
+  docker-start:
+    desc: Start Docker cluster
+    cmds:
+      - ./docker-cluster.sh start
+
+  docker-stop:
+    desc: Stop Docker cluster
+    cmds:
+      - ./docker-cluster.sh stop
+
+  docker-logs:
+    desc: Show Docker cluster logs
+    cmds:
+      - ./docker-cluster.sh logs
+
+  k8s-deploy:
+    desc: Deploy to Kubernetes
+    dir: kubernetes
+    cmds:
+      - ./setup.sh deploy
+
+  k8s-cleanup:
+    desc: Cleanup Kubernetes deployment
+    dir: kubernetes
+    cmds:
+      - ./setup.sh cleanup
+
+  k8s-status:
+    desc: Show Kubernetes deployment status
+    dir: kubernetes
+    cmds:
+      - ./setup.sh status

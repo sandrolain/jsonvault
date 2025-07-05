@@ -1,0 +1,152 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: jsonvault
+  labels:
+    name: jsonvault
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jsonvault-config
+  namespace: jsonvault
+data:
+  RUST_LOG: "info"
+  JSONVAULT_PORT: "8080"
+  JSONVAULT_RAFT_PORT: "8090"
+  JSONVAULT_DATA_DIR: "/data"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jsonvault-headless
+  namespace: jsonvault
+  labels:
+    app: jsonvault
+spec:
+  clusterIP: None
+  selector:
+    app: jsonvault
+  ports:
+    - name: api
+      port: 8080
+      targetPort: 8080
+    - name: raft
+      port: 8090
+      targetPort: 8090
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jsonvault-service
+  namespace: jsonvault
+  labels:
+    app: jsonvault
+spec:
+  type: LoadBalancer
+  selector:
+    app: jsonvault
+  ports:
+    - name: api
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    - name: raft
+      port: 8090
+      targetPort: 8090
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: jsonvault
+  namespace: jsonvault
+  labels:
+    app: jsonvault
+spec:
+  serviceName: jsonvault-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: jsonvault
+  template:
+    metadata:
+      labels:
+        app: jsonvault
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: jsonvault
+          image: jsonvault:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: api
+            - containerPort: 8090
+              name: raft
+          env:
+            - name: JSONVAULT_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: JSONVAULT_CLUSTER_NODES
+              value: "jsonvault-0.jsonvault-headless.jsonvault.svc.cluster.local:8090,jsonvault-1.jsonvault-headless.jsonvault.svc.cluster.local:8090,jsonvault-2.jsonvault-headless.jsonvault.svc.cluster.local:8090"
+          envFrom:
+            - configMapRef:
+                name: jsonvault-config
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /etc/jsonvault
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+      volumes:
+        - name: config
+          configMap:
+            name: jsonvault-config
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          app: jsonvault
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "standard"
+        resources:
+          requests:
+            storage: 10Gi

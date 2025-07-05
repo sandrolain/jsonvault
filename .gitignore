@@ -1,0 +1,5 @@
+/target
+/go-client/main
+
+# macOS
+.DS_Store

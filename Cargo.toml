@@ -1,0 +1,48 @@
+[package]
+name = "jsonvault"
+version = "0.1.0"
+edition = "2021"
+description = "High-performance in-memory JSON database with JSONPath support and Raft consensus"
+authors = ["Sandro Lain <sandro.lain@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/sandrolain/jsonvault"
+keywords = ["json", "database", "jsonpath", "raft", "consensus"]
+categories = ["database", "data-structures"]
+
+[dependencies]
+tokio = { version = "1.35", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+jsonpath_lib = "0.3"
+dashmap = "5.5"
+bytes = "1.5"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+log = "0.4"
+env_logger = "0.10"
+bincode = "1.3"
+clap = { version = "4.4", features = ["derive"] }
+fastrand = "2.0"
+# Raft consensus implementation (using simplified custom implementation)
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
+thiserror = "1.0"
+anyhow = "1.0"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bin]]
+name = "server"
+path = "src/server.rs"
+
+[[bin]]
+name = "client"
+path = "src/client.rs"
+
+[[bench]]
+name = "benchmarks"
+harness = false
+
+[[example]]
+name = "raft_demo"
+path = "examples/raft_demo.rs"

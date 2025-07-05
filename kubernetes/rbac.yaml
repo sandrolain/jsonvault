@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jsonvault-sa
+  namespace: jsonvault
+  labels:
+    app: jsonvault
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: jsonvault
+  name: jsonvault-role
+  labels:
+    app: jsonvault
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jsonvault-rolebinding
+  namespace: jsonvault
+  labels:
+    app: jsonvault
+subjects:
+  - kind: ServiceAccount
+    name: jsonvault-sa
+    namespace: jsonvault
+roleRef:
+  kind: Role
+  name: jsonvault-role
+  apiGroup: rbac.authorization.k8s.io

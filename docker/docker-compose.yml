@@ -1,0 +1,126 @@
+version: "3.8"
+
+services:
+  # JsonVault Node 1 (Leader/Primary)
+  jsonvault-node1:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: jsonvault-node1
+    hostname: jsonvault-node1
+    ports:
+      - "8080:8080"
+      - "8090:8090" # Raft port
+    environment:
+      - RUST_LOG=info
+      - JSONVAULT_PORT=8080
+      - JSONVAULT_RAFT_PORT=8090
+      - JSONVAULT_NODE_ID=1
+      - JSONVAULT_CLUSTER_NODES=jsonvault-node1:8090,jsonvault-node2:8091,jsonvault-node3:8092
+      - JSONVAULT_DATA_DIR=/data
+    volumes:
+      - jsonvault-node1-data:/data
+    networks:
+      - jsonvault-cluster
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # JsonVault Node 2 (Replica)
+  jsonvault-node2:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: jsonvault-node2
+    hostname: jsonvault-node2
+    ports:
+      - "8081:8080"
+      - "8091:8090" # Raft port
+    environment:
+      - RUST_LOG=info
+      - JSONVAULT_PORT=8080
+      - JSONVAULT_RAFT_PORT=8090
+      - JSONVAULT_NODE_ID=2
+      - JSONVAULT_CLUSTER_NODES=jsonvault-node1:8090,jsonvault-node2:8091,jsonvault-node3:8092
+      - JSONVAULT_DATA_DIR=/data
+    volumes:
+      - jsonvault-node2-data:/data
+    networks:
+      - jsonvault-cluster
+    restart: unless-stopped
+    depends_on:
+      - jsonvault-node1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # JsonVault Node 3 (Replica)
+  jsonvault-node3:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: jsonvault-node3
+    hostname: jsonvault-node3
+    ports:
+      - "8082:8080"
+      - "8092:8090" # Raft port
+    environment:
+      - RUST_LOG=info
+      - JSONVAULT_PORT=8080
+      - JSONVAULT_RAFT_PORT=8090
+      - JSONVAULT_NODE_ID=3
+      - JSONVAULT_CLUSTER_NODES=jsonvault-node1:8090,jsonvault-node2:8091,jsonvault-node3:8092
+      - JSONVAULT_DATA_DIR=/data
+    volumes:
+      - jsonvault-node3-data:/data
+    networks:
+      - jsonvault-cluster
+    restart: unless-stopped
+    depends_on:
+      - jsonvault-node1
+      - jsonvault-node2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Load Balancer (HAProxy)
+  loadbalancer:
+    image: haproxy:2.8-alpine
+    container_name: jsonvault-lb
+    ports:
+      - "8000:8000" # Main load balancer port
+      - "8404:8404" # HAProxy stats
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    networks:
+      - jsonvault-cluster
+    depends_on:
+      - jsonvault-node1
+      - jsonvault-node2
+      - jsonvault-node3
+    restart: unless-stopped
+
+volumes:
+  jsonvault-node1-data:
+    driver: local
+  jsonvault-node2-data:
+    driver: local
+  jsonvault-node3-data:
+    driver: local
+
+networks:
+  jsonvault-cluster:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
