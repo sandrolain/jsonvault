@@ -11,8 +11,8 @@ echo "📦 Compiling project..."
 cargo build --release
 
 # Start the server in background
-echo "🔧 Starting primary server..."
-cargo run --bin server --release -- --address 127.0.0.1:8090 --primary --node-id master &
+echo "🔧 Starting Raft server..."
+cargo run --bin server --release -- --enable-raft --address 127.0.0.1:8090 --node-id 1 &
 SERVER_PID=$!
 
 # Wait for server to start
@@ -92,20 +92,6 @@ cargo run --bin client --release -- --server 127.0.0.1:8090 get config
 echo "🏓 Testing PING..."
 cargo run --bin client --release -- --server 127.0.0.1:8090 ping
 
-# Start a replica
-echo "🔄 Starting replica..."
-cargo run --bin server --release -- --address 127.0.0.1:8091 --replica-of 127.0.0.1:8090 --node-id replica-1 &
-REPLICA_PID=$!
-
-sleep 2
-
-echo "✅ Replica started (PID: $REPLICA_PID)"
-
-# Test connection to replica
-echo "📡 Testing connection to replica..."
-cargo run --bin client --release -- --server 127.0.0.1:8091 ping
-cargo run --bin client --release -- --server 127.0.0.1:8091 get user
-
 # DELETE
 echo "🗑️ Testing DELETE..."
 cargo run --bin client --release -- --server 127.0.0.1:8090 delete config
@@ -115,7 +101,7 @@ echo "✅ All tests completed successfully!"
 
 # Cleanup
 echo "🧹 Cleaning up processes..."
-kill $SERVER_PID $REPLICA_PID
-wait $SERVER_PID $REPLICA_PID 2>/dev/null || true
+kill $SERVER_PID
+wait $SERVER_PID 2>/dev/null || true
 
 echo "🎉 Test completed!"

@@ -30,12 +30,12 @@ impl TcpServer {
                     let db = Arc::clone(&self.database);
                     tokio::spawn(async move {
                         if let Err(e) = handle_connection(stream, db).await {
-                            error!("Errore nella gestione della connessione da {}: {}", addr, e);
+                            error!("Error handling connection from {}: {}", addr, e);
                         }
                     });
                 }
                 Err(e) => {
-                    error!("Errore nell'accettazione della connessione: {}", e);
+                    error!("Error accepting connection: {}", e);
                 }
             }
         }
@@ -56,7 +56,7 @@ async fn handle_connection(mut stream: TcpStream, database: Arc<Database>) -> Re
             Ok(n) => {
                 debug!("Ricevuti {} bytes", n);
             }
-            Err(e) => return Err(format!("Errore lettura: {}", e)),
+            Err(e) => return Err(format!("Read error: {}", e)),
         }
 
         // Processa i messaggi nel buffer
@@ -92,16 +92,16 @@ fn parse_message(buffer: &BytesMut) -> Result<Option<(Command, BytesMut)>, Strin
         return Ok(None); // Non abbastanza dati per il messaggio completo
     }
 
-    // Estrai il payload
+    // Extract the payload
     let payload = &buffer[4..4 + message_length];
 
-    // Deserializza il comando usando JSON
+    // Deserialize the command using JSON
     let payload_str =
-        std::str::from_utf8(payload).map_err(|e| format!("Payload non UTF-8: {}", e))?;
+        std::str::from_utf8(payload).map_err(|e| format!("Non-UTF-8 payload: {}", e))?;
     let command: Command = serde_json::from_str(payload_str)
-        .map_err(|e| format!("Errore deserializzazione JSON: {}", e))?;
+        .map_err(|e| format!("JSON deserialization error: {}", e))?;
 
-    // Crea il buffer rimanente
+    // Create the remaining buffer
     let mut remaining = BytesMut::new();
     if buffer.len() > 4 + message_length {
         remaining.extend_from_slice(&buffer[4 + message_length..]);
@@ -112,9 +112,9 @@ fn parse_message(buffer: &BytesMut) -> Result<Option<(Command, BytesMut)>, Strin
 
 /// Invia una risposta al client
 async fn send_response(stream: &mut TcpStream, response: Response) -> Result<(), String> {
-    // Serializza la risposta usando JSON
+    // Serialize response using JSON
     let payload_str = serde_json::to_string(&response)
-        .map_err(|e| format!("Errore serializzazione JSON: {}", e))?;
+        .map_err(|e| format!("JSON serialization error: {}", e))?;
     let payload = payload_str.as_bytes();
     let payload_length = payload.len() as u32;
 
@@ -123,20 +123,20 @@ async fn send_response(stream: &mut TcpStream, response: Response) -> Result<(),
     message.put_u32(payload_length);
     message.extend_from_slice(payload);
 
-    // Invia il messaggio
+    // Send the message
     stream
         .write_all(&message)
         .await
-        .map_err(|e| format!("Errore invio: {}", e))?;
+        .map_err(|e| format!("Send error: {}", e))?;
     stream
         .flush()
         .await
-        .map_err(|e| format!("Errore flush: {}", e))?;
+        .map_err(|e| format!("Flush error: {}", e))?;
 
     Ok(())
 }
 
-/// Client TCP per il database JSON
+/// TCP client for JSON database
 pub struct TcpClient {
     stream: TcpStream,
 }
@@ -153,15 +153,15 @@ impl TcpClient {
 
     /// Invia un comando e riceve la risposta
     pub async fn send_command(&mut self, command: Command) -> Result<Response, String> {
-        debug!("Invio comando: {}", command);
+        debug!("Sending command: {}", command);
 
-        // Serializza il comando usando JSON
+        // Serialize command using JSON
         let payload_str = serde_json::to_string(&command)
-            .map_err(|e| format!("Errore serializzazione JSON: {}", e))?;
+            .map_err(|e| format!("JSON serialization error: {}", e))?;
         let payload = payload_str.as_bytes();
         let payload_length = payload.len() as u32;
 
-        // Crea il messaggio con lunghezza + payload
+        // Create message with length + payload
         let mut message = BytesMut::with_capacity(4 + payload.len());
         message.put_u32(payload_length);
         message.extend_from_slice(payload);
@@ -170,50 +170,50 @@ impl TcpClient {
         self.stream
             .write_all(&message)
             .await
-            .map_err(|e| format!("Errore invio: {}", e))?;
+            .map_err(|e| format!("Send error: {}", e))?;
         self.stream
             .flush()
             .await
-            .map_err(|e| format!("Errore flush: {}", e))?;
+            .map_err(|e| format!("Flush error: {}", e))?;
 
-        // Ricevi la risposta
+        // Receive the response
         let response = self.receive_response().await?;
         debug!("Risposta ricevuta: {}", response);
 
         Ok(response)
     }
 
-    /// Riceve una risposta dal server
+    /// Receive a response from the server
     async fn receive_response(&mut self) -> Result<Response, String> {
-        // Leggi la lunghezza
+        // Read the length
         let mut length_bytes = [0u8; 4];
         self.stream
             .read_exact(&mut length_bytes)
             .await
-            .map_err(|e| format!("Errore lettura lunghezza: {}", e))?;
+            .map_err(|e| format!("Length read error: {}", e))?;
         let message_length = u32::from_be_bytes(length_bytes) as usize;
 
-        // Leggi il payload
+        // Read the payload
         let mut payload = vec![0u8; message_length];
         self.stream
             .read_exact(&mut payload)
             .await
-            .map_err(|e| format!("Errore lettura payload: {}", e))?;
+            .map_err(|e| format!("Payload read error: {}", e))?;
 
-        // Deserializza la risposta usando JSON
+        // Deserialize response using JSON
         let payload_str =
-            std::str::from_utf8(&payload).map_err(|e| format!("Payload non UTF-8: {}", e))?;
+            std::str::from_utf8(&payload).map_err(|e| format!("Non-UTF-8 payload: {}", e))?;
         let response: Response = serde_json::from_str(payload_str)
-            .map_err(|e| format!("Errore deserializzazione JSON: {}", e))?;
+            .map_err(|e| format!("JSON deserialization error: {}", e))?;
         Ok(response)
     }
 
-    /// Chiude la connessione
+    /// Close the connection
     pub async fn close(mut self) -> Result<(), String> {
         self.stream
             .shutdown()
             .await
-            .map_err(|e| format!("Errore chiusura: {}", e))?;
+            .map_err(|e| format!("Close error: {}", e))?;
         Ok(())
     }
 }

@@ -151,12 +151,9 @@ func (c *Client) sendCommand(cmd interface{}) (interface{}, error) {
 func parseResponse(resp interface{}) (value interface{}, err error) {
 	switch v := resp.(type) {
 	case string:
-		// Handle enum variants like "Pong", "ReplicationAck"
+		// Handle enum variants like "Pong"
 		if v == "Pong" {
 			return nil, nil // Pong successful
-		}
-		if v == "ReplicationAck" {
-			return nil, nil
 		}
 		// Otherwise it's an error message or unknown
 		return nil, fmt.Errorf("unexpected string response: %s", v)

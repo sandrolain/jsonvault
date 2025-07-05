@@ -3,7 +3,7 @@ version: "3"
 vars:
   PACKAGE_NAME: jsonvault
   DEFAULT_PORT: 8080
-  REPLICA_PORT: 8081
+  RAFT_PORT: 8090
   TEST_PORT: 9090
 
 tasks:
@@ -61,8 +61,8 @@ tasks:
   test-integration:
     desc: Run integration tests
     cmds:
-      - chmod +x test.sh
-      - ./test.sh
+      - chmod +x scripts/test.sh
+      - ./scripts/test.sh
 
   # Benchmark tasks
   bench:
@@ -77,42 +77,69 @@ tasks:
 
   # Run tasks
   run-server:
-    desc: Run the server on default port
+    desc: Run the server on default port (legacy mode)
     cmds:
-      - cargo run --bin server -- --port {{.DEFAULT_PORT}}
+      - cargo run --bin server -- --address 127.0.0.1:{{.DEFAULT_PORT}}
 
-  run-server-replica:
-    desc: Run a replica server
+  run-server-raft:
+    desc: Run a Raft server (recommended)
     cmds:
-      - cargo run --bin server -- --port {{.REPLICA_PORT}} --master-address 127.0.0.1:{{.DEFAULT_PORT}}
+      - cargo run --bin server -- --enable-raft --address 127.0.0.1:{{.RAFT_PORT}} --node-id 1
 
   run-client:
     desc: Run interactive client
     cmds:
-      - cargo run --bin client -- --address 127.0.0.1:{{.DEFAULT_PORT}}
+      - cargo run --bin client -- --server 127.0.0.1:{{.RAFT_PORT}} interactive
 
   run-example:
     desc: Run basic usage example
     cmds:
       - cargo run --example basic_usage
 
-  # Server management tasks
-  start-cluster:
-    desc: Start a master server and a replica
+  run-raft-demo:
+    desc: Run Raft demonstration example
+    cmds:
+      - cargo run --example raft_demo
+
+  # Raft cluster management tasks
+  start-raft-cluster:
+    desc: Start a single-node Raft cluster
     deps: [build]
     cmds:
       - |
-        echo "Starting master server on port {{.DEFAULT_PORT}}..."
-        cargo run --bin server -- --port {{.DEFAULT_PORT}} &
-        MASTER_PID=$!
-        sleep 2
-        echo "Starting replica server on port {{.REPLICA_PORT}}..."
-        cargo run --bin server -- --port {{.REPLICA_PORT}} --master-address 127.0.0.1:{{.DEFAULT_PORT}} &
-        REPLICA_PID=$!
-        echo "Cluster started. Master PID: $MASTER_PID, Replica PID: $REPLICA_PID"
-        echo "Press Ctrl+C to stop both servers"
-        trap "kill $MASTER_PID $REPLICA_PID" INT
-        wait
+        echo "Starting Raft server on port {{.RAFT_PORT}}..."
+        cargo run --bin server -- --enable-raft --address 127.0.0.1:{{.RAFT_PORT}} --node-id 1
+
+  start-raft-multi:
+    desc: Start a multi-node Raft cluster (future feature)
+    deps: [build]
+    cmds:
+      - echo "Multi-node Raft cluster support coming soon!"
+      - echo "Currently supports single-node clusters with automatic failover"
+
+  # Docker Raft tasks
+  docker-raft:
+    desc: Start Raft cluster using Docker Compose
+    cmds:
+      - docker-compose -f deployment/docker-compose-raft.yml up --build
+
+  docker-raft-down:
+    desc: Stop Raft cluster
+    cmds:
+      - docker-compose -f deployment/docker-compose-raft.yml down
+
+  # Test Raft tasks
+  test-raft:
+    desc: Run Raft-specific tests
+    cmds:
+      - chmod +x scripts/test-raft.sh
+      - ./scripts/test-raft.sh
+
+  bench-raft:
+    desc: Run Raft benchmarks
+    cmds:
+      - chmod +x scripts/benchmark-raft.sh
+      - ./scripts/benchmark-raft.sh
 
   # Clean tasks
   clean:
@@ -172,12 +199,12 @@ tasks:
       - go build -o simple-example simple.go
 
   run-test-server:
-    desc: Start server for testing (background)
+    desc: Start Raft server for testing (background)
     cmds:
       - |
         if ! pgrep -f "server.*{{.TEST_PORT}}" > /dev/null; then
-          echo "Starting test server on port {{.TEST_PORT}}..."
-          cargo run --bin server -- --port {{.TEST_PORT}} &
+          echo "Starting Raft test server on port {{.TEST_PORT}}..."
+          cargo run --bin server -- --enable-raft --address 127.0.0.1:{{.TEST_PORT}} --node-id 999 &
           sleep 2
         else
           echo "Test server already running on port {{.TEST_PORT}}"
@@ -200,13 +227,15 @@ tasks:
     cmds:
       - task: check
       - task: test
+      - task: test-raft
       - task: test-integration
       - task: build-release
 
   full-test:
-    desc: Run all tests including Go client
+    desc: Run all tests including Go client and Raft
     cmds:
       - task: test
+      - task: test-raft
       - task: go-test
       - task: test-integration
 
