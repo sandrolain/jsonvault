@@ -1,31 +1,31 @@
-use jsonvault::{RaftManager, Database, Command, ClusterMetrics};
+use jsonvault::{RaftManager, Database, Command};
 use std::sync::Arc;
 use tokio;
 use serde_json::json;
 
-/// Esempio che dimostra l'utilizzo di JsonVault con Raft consensus
+/// Example demonstrating JsonVault usage with Raft consensus
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
     println!("=== JsonVault Raft Example ===");
 
-    // Crea il database
+    // Create the database
     let database = Arc::new(Database::new());
     println!("✓ Database created");
 
-    // Crea il manager Raft
+    // Create the Raft manager
     let mut raft_manager = RaftManager::new(1, Arc::clone(&database)).await?;
     println!("✓ Raft manager created");
 
-    // Inizializza un cluster single-node
+    // Initialize a single-node cluster
     raft_manager.initialize_cluster(vec![1]).await?;
     println!("✓ Single-node cluster initialized");
 
-    // Aspetta un momento per l'inizializzazione completa
+    // Wait a moment for complete initialization
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    // Verifica che siamo leader
+    // Verify we are the leader
     if raft_manager.is_leader().await {
         println!("✓ Node is leader");
     } else {
@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // Mostra le metriche iniziali
+    // Show initial metrics
     let metrics = raft_manager.metrics().await;
     println!("📊 Initial metrics: {:?}", metrics);
 
@@ -95,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => println!("   ✗ MERGE failed: {}", e),
     }
 
-    // Verifica il risultato del merge
+    // Verify the merge result
     println!("\n5. Verifying MERGE result...");
     let verify_command = Command::Get {
         key: "user:1".to_string(),
@@ -125,17 +125,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Mostra le metriche finali
+    // Show final metrics
     println!("\n=== Final Metrics ===");
     let final_metrics = raft_manager.metrics().await;
     println!("📊 Final metrics: {:?}", final_metrics);
 
-    // Simulazione di uno scenario di failover
+    // Simulate a failover scenario
     println!("\n=== Simulating Leadership Scenarios ===");
     println!("Leader ID: {:?}", raft_manager.leader_id().await);
     println!("Is Leader: {}", raft_manager.is_leader().await);
 
-    // Test delle performance
+    // Performance test
     println!("\n=== Performance Test ===");
     let start = std::time::Instant::now();
     let num_ops = 100;

@@ -23,8 +23,6 @@ pub enum Command {
     Merge { key: String, value: Value },
     /// PING - Health check
     Ping,
-    /// REPLICATE - Commands for replication
-    Replicate { data: ReplicationData },
 }
 
 /// Server response
@@ -36,30 +34,6 @@ pub enum Response {
     Error(String),
     /// Response to PING
     Pong,
-    /// Response to replication
-    ReplicationAck,
-}
-
-/// Replication data
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ReplicationData {
-    /// Full database synchronization
-    FullSync(Vec<(String, Value)>),
-    /// Single operation to replicate
-    Operation {
-        op_type: OperationType,
-        key: String,
-        value: Option<Value>,
-    },
-}
-
-/// Operation type for replication
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum OperationType {
-    Set,
-    Delete,
-    Merge,
-    QSet,
 }
 
 impl fmt::Display for Command {
@@ -72,7 +46,6 @@ impl fmt::Display for Command {
             Command::QSet { key, path, .. } => write!(f, "QSET {} {}", key, path),
             Command::Merge { key, .. } => write!(f, "MERGE {}", key),
             Command::Ping => write!(f, "PING"),
-            Command::Replicate { .. } => write!(f, "REPLICATE"),
         }
     }
 }
@@ -84,7 +57,6 @@ impl fmt::Display for Response {
             Response::Ok(None) => write!(f, "OK"),
             Response::Error(msg) => write!(f, "ERROR {}", msg),
             Response::Pong => write!(f, "PONG"),
-            Response::ReplicationAck => write!(f, "REPLICATION_ACK"),
         }
     }
 }

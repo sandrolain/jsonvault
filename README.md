@@ -10,7 +10,7 @@ A high-performance, in-memory JSON database with JSONPath support, Raft consensu
 - **JSON Merge**: Capability to perform intelligent merges of JSON values
 - **Lightweight TCP Protocol**: High-performance communication via TCP with JSON serialization
 - **Raft Consensus**: Distributed consensus algorithm for automatic failover and data consistency
-- **Horizontal Replication**: Support for master-slave replication with automatic synchronization
+- **Horizontal Clustering**: Support for multi-node clusters with automatic failover
 - **High-Performance APIs**: Operations optimized for minimal latency
 - **Multi-language Clients**: Native support for Rust and Go clients
 
@@ -49,21 +49,11 @@ cargo run --bin server -- --enable-raft --address 127.0.0.1:8081 --node-id "2" -
 cargo run --bin server -- --enable-raft --address 127.0.0.1:8082 --node-id "3" --cluster-nodes "1,2"
 ```
 
-#### Legacy Mode - Primary Server
+#### Basic Server
 
 ```bash
-# Start a primary server on port 8080
-cargo run --bin server -- --address 127.0.0.1:8080 --primary
-
-# With custom node ID
-cargo run --bin server -- --address 127.0.0.1:8080 --primary --node-id master-01
-```
-
-#### Legacy Mode - Replica Server
-
-```bash
-# Start a replica that connects to the primary
-cargo run --bin server -- --address 127.0.0.1:8081 --replica-of 127.0.0.1:8080 --node-id replica-01
+# Start a single-node server (simple mode)
+cargo run --bin server -- --address 127.0.0.1:8080
 ```
 
 ### Using the Client
@@ -206,30 +196,35 @@ json-db> get config
 }
 ```
 
-## Replication
+## Raft Clustering
 
 ### Architecture
 
-The system supports master-slave replication:
+The system uses Raft consensus algorithm for distributed clustering:
 
-- **Primary Node**: Handles all write operations and replicates them to slaves
-- **Replica Nodes**: Receive changes from the primary and can serve reads
-- **Synchronization**: Automatic for new replicas and real-time operations
+- **Leader Node**: Handles all write operations and replicates them to followers
+- **Follower Nodes**: Receive replicated log entries from the leader and participate in leader election
+- **Automatic Failover**: When a leader fails, followers automatically elect a new leader
+- **Consensus**: All operations require majority consensus for commitment
 
 ### Cluster Configuration
 
 ```bash
-# 1. Start the primary node
-cargo run --bin server -- --address 127.0.0.1:8080 --primary --node-id master
+# 1. Start the first node (will become leader in single-node cluster)
+cargo run --bin server -- --enable-raft --address 127.0.0.1:8080 --node-id 1
 
-# 2. Start replicas
-cargo run --bin server -- --address 127.0.0.1:8081 --replica-of 127.0.0.1:8080 --node-id replica-1
-cargo run --bin server -- --address 127.0.0.1:8082 --replica-of 127.0.0.1:8080 --node-id replica-2
+# 2. Start additional nodes (multi-node support planned)
+# cargo run --bin server -- --enable-raft --address 127.0.0.1:8081 --node-id 2 --cluster-nodes "1,3"
+# cargo run --bin server -- --enable-raft --address 127.0.0.1:8082 --node-id 3 --cluster-nodes "1,2"
 ```
 
-### Failover
+### Automatic Failover
 
-In case of primary failure, a replica can be manually promoted to the new primary. Automatic failover will be implemented in future versions.
+Raft provides automatic failover capabilities:
+
+- **Leader Election**: Automatic election of new leaders when the current leader fails
+- **Log Replication**: Consistent replication of operations across all nodes
+- **Split-Brain Prevention**: Majority consensus prevents split-brain scenarios
 
 ## Performance
 
@@ -258,7 +253,7 @@ cargo test
 # Specific tests
 cargo test database
 cargo test network
-cargo test replication
+cargo test raft
 
 # Run the complete test script
 ./test.sh
@@ -279,14 +274,15 @@ RUST_LOG=error cargo run --bin server
 ## Current Limitations
 
 1. **Persistence**: The database is completely in-memory (disk persistence planned)
-2. **Automatic failover**: Requires manual intervention (automatic implementation planned)
+2. **Multi-node clusters**: Currently supports single-node Raft clusters (multi-node implementation in progress)
 3. **Authentication**: Not implemented (planned for future versions)
 4. **Compression**: Not implemented for network protocol
 
 ## Roadmap
 
 - [ ] Disk persistence with WAL (Write-Ahead Log)
-- [ ] Raft consensus algorithm for automatic failover
+- [x] Raft consensus algorithm for automatic failover (single-node complete)
+- [ ] Multi-node Raft cluster support
 - [ ] Authentication and authorization system
 - [ ] Network protocol compression
 - [ ] Web interface for monitoring

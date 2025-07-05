@@ -51,15 +51,11 @@ EXPOSE 8080
 ENV RUST_LOG=info
 ENV JSONVAULT_PORT=8080
 ENV JSONVAULT_DATA_DIR=/data
-ENV JSONVAULT_ENABLE_RAFT=false
+ENV JSONVAULT_NODE_ID=1
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:${JSONVAULT_PORT}/health || exit 1
 
-# Default command with Raft support
-CMD ["sh", "-c", "if [ \"$JSONVAULT_ENABLE_RAFT\" = \"true\" ]; then \
-  jsonvault-server --enable-raft --address 0.0.0.0:${JSONVAULT_PORT} --node-id ${HOSTNAME}; \
-  else \
-  jsonvault-server --primary --address 0.0.0.0:${JSONVAULT_PORT}; \
-  fi"]
+# Default command with Raft consensus
+CMD ["sh", "-c", "jsonvault-server --enable-raft --address 0.0.0.0:${JSONVAULT_PORT} --node-id ${JSONVAULT_NODE_ID}"]

@@ -267,8 +267,5 @@ fn print_response(response: &Response) {
         Response::Pong => {
             println!("PONG");
         }
-        Response::ReplicationAck => {
-            println!("Replica synchronized");
-        }
     }
 }

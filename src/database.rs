@@ -1,17 +1,14 @@
-use crate::protocol::{Command, OperationType, ReplicationData, Response};
+use crate::protocol::{Command, Response};
 use dashmap::DashMap;
-use log::{debug, error, info};
+use log::{debug, error};
 use serde_json::Value;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
-/// In-memory thread-safe key-value database
+/// In-memory thread-safe JSON key-value database optimized for Raft consensus
 #[derive(Debug, Clone)]
 pub struct Database {
     /// Main storage using DashMap for optimal concurrency
     data: Arc<DashMap<String, Value>>,
-    /// List of replicas for synchronization
-    replicas: Arc<RwLock<Vec<String>>>,
 }
 
 impl Database {
@@ -19,24 +16,7 @@ impl Database {
     pub fn new() -> Self {
         Self {
             data: Arc::new(DashMap::new()),
-            replicas: Arc::new(RwLock::new(Vec::new())),
         }
-    }
-
-    /// Adds a replica to the list
-    pub async fn add_replica(&self, replica_address: String) {
-        let mut replicas = self.replicas.write().await;
-        if !replicas.contains(&replica_address) {
-            replicas.push(replica_address);
-            info!("Added replica: {}", replicas.last().unwrap());
-        }
-    }
-
-    /// Removes a replica from the list
-    pub async fn remove_replica(&self, replica_address: &str) {
-        let mut replicas = self.replicas.write().await;
-        replicas.retain(|addr| addr != replica_address);
-        info!("Removed replica: {}", replica_address);
     }
 
     /// Execute a command and return the response
@@ -49,7 +29,6 @@ impl Database {
             Command::QSet { key, path, value } => self.qset(key, path, value).await,
             Command::Merge { key, value } => self.merge(key, value).await,
             Command::Ping => Response::Pong,
-            Command::Replicate { data } => self.handle_replication(data).await,
         }
     }
 
@@ -62,10 +41,6 @@ impl Database {
 
         self.data.insert(key.clone(), value.clone());
         debug!("SET: {} = {}", key, value);
-
-        // Replicate the operation
-        self.replicate_operation(OperationType::Set, key, Some(value))
-            .await;
 
         Response::Ok(None)
     }
@@ -89,9 +64,6 @@ impl Database {
         match self.data.remove(&key) {
             Some(_) => {
                 debug!("DELETE: {} removed", key);
-                // Replicate the operation
-                self.replicate_operation(OperationType::Delete, key, None)
-                    .await;
                 Response::Ok(None)
             }
             None => {
@@ -152,11 +124,6 @@ impl Database {
             Ok(()) => {
                 self.data.insert(key.clone(), modified_value.clone());
                 debug!("QSET: {} at path '{}' = {}", key, path, value);
-
-                // Replicate the operation
-                self.replicate_operation(OperationType::QSet, key, Some(modified_value))
-                    .await;
-
                 Response::Ok(None)
             }
             Err(e) => {
@@ -185,77 +152,7 @@ impl Database {
 
         self.data.insert(key.clone(), merged_value.clone());
         debug!("MERGE: {} = {}", key, merged_value);
-
-        // Replicate the operation
-        self.replicate_operation(OperationType::Merge, key, Some(merged_value))
-            .await;
-
         Response::Ok(None)
-    }
-
-    /// Handles replication commands
-    async fn handle_replication(&self, data: ReplicationData) -> Response {
-        match data {
-            ReplicationData::FullSync(entries) => {
-                // Full synchronization
-                self.data.clear();
-                for (key, value) in entries {
-                    self.data.insert(key, value);
-                }
-                info!("Full synchronization completed");
-                Response::ReplicationAck
-            }
-            ReplicationData::Operation {
-                op_type,
-                key,
-                value,
-            } => {
-                // Apply single operation
-                match op_type {
-                    OperationType::Set => {
-                        if let Some(v) = value {
-                            self.data.insert(key, v);
-                        }
-                    }
-                    OperationType::Delete => {
-                        self.data.remove(&key);
-                    }
-                    OperationType::Merge => {
-                        if let Some(v) = value {
-                            self.data.insert(key, v);
-                        }
-                    }
-                    OperationType::QSet => {
-                        if let Some(v) = value {
-                            self.data.insert(key, v);
-                        }
-                    }
-                }
-                Response::ReplicationAck
-            }
-        }
-    }
-
-    /// Replicates an operation to all replicas
-    async fn replicate_operation(&self, op_type: OperationType, key: String, value: Option<Value>) {
-        let replicas = self.replicas.read().await;
-        if replicas.is_empty() {
-            return;
-        }
-
-        let replication_data = ReplicationData::Operation {
-            op_type,
-            key,
-            value,
-        };
-        let command = Command::Replicate {
-            data: replication_data,
-        };
-
-        for replica in replicas.iter() {
-            // TODO: Implement sending command to replicas
-            debug!("Replicating command to {}: {:?}", replica, command);
-        }
     }
 
     /// Sets a value at a JSONPath location
@@ -386,14 +283,6 @@ impl Database {
                 Ok(new.clone())
             }
         }
-    }
-
-    /// Gets all data for full synchronization
-    pub async fn get_all_data(&self) -> Vec<(String, Value)> {
-        self.data
-            .iter()
-            .map(|entry| (entry.key().clone(), entry.value().clone()))
-            .collect()
     }
 
     /// Gets the number of keys in the database
